@@ -120,8 +120,8 @@ log_complete "phpbrew"
 IFS=',' read -ra php_versions_array <<< "$php_versions"
 for php_version in "${php_versions_array[@]}"; do
   log_progress "installing PHP $php_version"
-  phpbrew install "$php_version" +default
-  phpbrew switch "$php_version"
+  source ~/.phpbrew/bashrc  # Ensure phpbrew is sourced
+  phpbrew use "$php_version"  # Activate the PHP version
   log_complete "PHP $php_version"
 done
 
