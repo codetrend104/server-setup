@@ -1,13 +1,22 @@
 #!/bin/bash
 
-# Set non-interactive mode for package installations/updates
-export DEBIAN_FRONTEND=noninteractive
-
 # Define ANSI color codes
 GREEN="\e[32m"
 YELLOW="\e[33m"
 RED="\e[31m"
 RESET="\e[0m"
+
+# Source phpbrew configuration
+source ~/.phpbrew/bashrc
+
+# Set non-interactive mode for package installations/updates
+export DEBIAN_FRONTEND=noninteractive
+
+# Check if the script is run as root
+if [ "$EUID" -ne 0 ]; then
+  echo -e "${RED}Please run as root${RESET}"
+  exit
+fi
 
 # Initialize variables with default values
 username=""
@@ -120,9 +129,8 @@ log_complete "phpbrew"
 IFS=',' read -ra php_versions_array <<< "$php_versions"
 for php_version in "${php_versions_array[@]}"; do
   log_progress "installing PHP $php_version"
-  source ~/.phpbrew/bashrc  # Ensure phpbrew is sourced
   phpbrew use "$php_version"  # Activate the PHP version
-  log_complete "PHP $php_version"
+  log_complete "PHP $php_version installed"
 done
 
 # Change SSH port
