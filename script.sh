@@ -3,11 +3,11 @@
 # Set non-interactive mode for package installations/updates
 export DEBIAN_FRONTEND=noninteractive
 
-# Check if the script is run as root
-if [ "$EUID" -ne 0 ]; then
-  echo "Please run as root"
-  exit
-fi
+# Define ANSI color codes
+GREEN="\e[32m"
+YELLOW="\e[33m"
+RED="\e[31m"
+RESET="\e[0m"
 
 # Initialize variables with default values
 username=""
@@ -16,6 +16,37 @@ php_versions=""
 mysql_password=""
 ssh_port=22
 ssh_key=""
+
+# Function to log progress with color
+function log_progress {
+  echo -e "${GREEN}Installing $1...${RESET}"
+}
+
+# Function to log completion with color
+function log_complete {
+  echo -e "${GREEN}$1 installed${RESET}"
+}
+
+# Function to log warnings with color
+function log_warning {
+  echo -e "${YELLOW}WARNING: $1${RESET}"
+}
+
+# Function to log errors with color
+function log_error {
+  echo -e "${RED}ERROR: $1${RESET}"
+}
+
+# Function to display configurations
+function display_configurations {
+  echo -e "${YELLOW}Configurations:${RESET}"
+  echo "Username: $username"
+  echo "Password: $password"
+  echo "PHP Versions: $php_versions"
+  echo "MySQL Password: $mysql_password"
+  echo "SSH Port: $ssh_port"
+  echo "SSH Key: $ssh_key"
+}
 
 # Get arguments
 while [ "$#" -gt 0 ]; do
@@ -50,16 +81,6 @@ while [ "$#" -gt 0 ]; do
       ;;
   esac
 done
-
-# Function to display installation progress
-function log_progress {
-  echo "Installing $1..."
-}
-
-# Function to display completion
-function log_complete {
-  echo "$1 installed"
-}
 
 # Function to set SSH key for the new user
 function set_ssh_key {
@@ -188,5 +209,8 @@ sudo ufw delete allow 'Nginx HTTP'
 log_progress "restarting services"
 systemctl restart nginx
 systemctl restart php"${php_versions_array[0]}"-fpm
+
+# Display configurations at the end
+display_configurations
 
 echo "Script completed successfully."
