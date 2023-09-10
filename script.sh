@@ -125,6 +125,17 @@ echo '[[ -e ~/.phpbrew/bashrc ]] && source ~/.phpbrew/bashrc' >> ~/.bashrc
 source ~/.bashrc
 log_complete "phpbrew"
 
+# Install additional packages
+log_progress "installing additional packages"
+sudo apt update -y
+packages=("libxml2-dev" "libbz2-dev" "libcurl4-openssl-dev" "libdb-dev" "libjpeg-dev" "libpng-dev" "libXpm-dev" "libfreetype6-dev" "libmysqlclient-dev" "libt1-dev" "libgd2-xpm-dev" "libgmp-dev" "libpspell-dev" "librecode-dev" "libldap2-dev" "libssl-dev" "libreadline-dev" "libtidy-dev" "libxslt-dev")
+
+for package in "${packages[@]}"; do
+  sudo apt install -y "$package"
+done
+
+log_complete "additional packages installed"
+
 # Install and switch to PHP versions
 IFS=',' read -ra php_versions_array <<< "$php_versions"
 for php_version in "${php_versions_array[@]}"; do
