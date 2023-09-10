@@ -140,9 +140,18 @@ log_complete "additional packages installed"
 IFS=',' read -ra php_versions_array <<< "$php_versions"
 for php_version in "${php_versions_array[@]}"; do
   log_progress "installing PHP $php_version"
-  phpbrew use "$php_version"  # Activate the PHP version
+  
+  # Check if the PHP version is installed, if not, install it
+  if ! phpbrew list | grep -q "$php_version"; then
+    log_warning "PHP $php_version not found. Installing..."
+    phpbrew install "$php_version" +default
+  fi
+  
+  # Activate the PHP version
+  phpbrew use "$php_version"
   log_complete "PHP $php_version installed"
 done
+
 
 # Change SSH port
 log_progress "changing SSH port to $ssh_port"
