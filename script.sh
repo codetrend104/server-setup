@@ -9,6 +9,14 @@ if [ "$EUID" -ne 0 ]; then
   exit
 fi
 
+# Initialize variables with default values
+username=""
+password=""
+php_versions=""
+mysql_password=""
+ssh_port=22
+ssh_key=""
+
 # Get arguments
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -28,6 +36,14 @@ while [ "$#" -gt 0 ]; do
       mysql_password="$2"
       shift 2
       ;;
+    -sp|--ssh-port)
+      ssh_port="$2"
+      shift 2
+      ;;
+    -sk|--ssh-key)
+      ssh_key="$2"
+      shift 2
+      ;;
     *)
       echo "Invalid argument: $1"
       exit 1
@@ -35,12 +51,36 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
+# Function to display installation progress
+function log_progress {
+  echo "Installing $1..."
+}
+
+# Function to display completion
+function log_complete {
+  echo "$1 installed"
+}
+
+# Function to set SSH key for the new user
+function set_ssh_key {
+  if [ -n "$ssh_key" ]; then
+    mkdir -p "/home/$username/.ssh"
+    echo "$ssh_key" > "/home/$username/.ssh/authorized_keys"
+    chown -R "$username:$username" "/home/$username/.ssh"
+    chmod 700 "/home/$username/.ssh"
+    chmod 600 "/home/$username/.ssh/authorized_keys"
+  fi
+}
+
 # Make a sudo user
+log_progress "creating user $username"
 useradd -m -s /bin/bash "$username"
 echo "$username:$password" | chpasswd
 usermod -aG sudo "$username"
+log_complete "user $username"
 
 # Install phpbrew
+log_progress "installing phpbrew"
 sudo apt update -y
 sudo apt upgrade -y
 sudo apt install -y software-properties-common
@@ -53,37 +93,56 @@ sudo mv phpbrew.phar /usr/local/bin/phpbrew
 phpbrew init
 echo '[[ -e ~/.phpbrew/bashrc ]] && source ~/.phpbrew/bashrc' >> ~/.bashrc
 source ~/.bashrc
+log_complete "phpbrew"
 
 # Install and switch to PHP versions
 IFS=',' read -ra php_versions_array <<< "$php_versions"
 for php_version in "${php_versions_array[@]}"; do
+  log_progress "installing PHP $php_version"
   phpbrew install "$php_version" +default
   phpbrew switch "$php_version"
+  log_complete "PHP $php_version"
 done
 
 # Change SSH port
-new_ssh_port=$(( (RANDOM % 49152) + 1024))
-sed -i "s/#Port 22/Port $new_ssh_port/" /etc/ssh/sshd_config
-echo "New SSH port: $new_ssh_port"
+log_progress "changing SSH port to $ssh_port"
+sed -i "s/#Port 22/Port $ssh_port/" /etc/ssh/sshd_config
+log_complete "SSH port changed to $ssh_port"
+
+# Set SSH key for the new user
+log_progress "setting SSH key for $username"
+set_ssh_key
+log_complete "SSH key set for $username"
 
 # Disable root login
+log_progress "disabling root login"
 sed -i 's/PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config
+log_complete "root login disabled"
 
 # Disable SSH password authentication
+log_progress "disabling SSH password authentication"
 sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
+log_complete "SSH password authentication disabled"
 
 # Add SSH and OpenSSH to UFW
-ufw allow "$new_ssh_port/tcp"
+log_progress "configuring UFW"
+ufw allow "$ssh_port/tcp"
 ufw allow OpenSSH
+log_complete "UFW configured"
 
 # Enable UFW and restart SSH service
+log_progress "enabling UFW and restarting SSH"
 ufw --force enable
 systemctl restart sshd
+log_complete "UFW enabled and SSH restarted"
 
 # Install Nginx
+log_progress "installing Nginx"
 sudo apt install -y nginx
+log_complete "Nginx installed"
 
 # Configure MySQL with specific options
+log_progress "configuring MySQL"
 cat <<EOF | sudo debconf-set-selections
 mysql-server-8.0 mysql-server/root_password password $mysql_password
 mysql-server-8.0 mysql-server/root_password_again password $mysql_password
@@ -101,8 +160,10 @@ EOF
 
 # Install MySQL server with the specific options
 sudo apt install -y mysql-server-8.0
+log_complete "MySQL installed"
 
 # Install Composer
+log_progress "installing Composer"
 sudo apt update
 sudo apt install -y unzip
 cd ~
@@ -111,8 +172,10 @@ HASH=$(curl -sS https://composer.github.io/installer.sig)
 php -r "if (hash_file('SHA384', '/tmp/composer-setup.php') === '$HASH') { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('/tmp/composer-setup.php'); } echo PHP_EOL;"
 php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer
 rm /tmp/composer-setup.php
+log_complete "Composer installed"
 
 # Setup Nginx and Let's Encrypt
+log_progress "setting up Nginx and Let's Encrypt"
 sudo apt update
 sudo apt install -y certbot python3-certbot-nginx
 sudo ufw allow 'Nginx Full'
@@ -122,6 +185,7 @@ sudo ufw delete allow 'Nginx HTTP'
 (crontab -l ; echo "15 3 * * * /usr/bin/certbot renew --quiet") | crontab -
 
 # Restart services
+log_progress "restarting services"
 systemctl restart nginx
 systemctl restart php"${php_versions_array[0]}"-fpm
 
