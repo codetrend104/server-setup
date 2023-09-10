@@ -1,0 +1,1 @@
+An script for ubuntu 22 server setup.
