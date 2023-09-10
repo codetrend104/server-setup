@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Set non-interactive mode for package installations/updates
+export DEBIAN_FRONTEND=noninteractive
+
 # Check if the script is run as root
 if [ "$EUID" -ne 0 ]; then
   echo "Please run as root"
@@ -80,22 +83,24 @@ systemctl restart sshd
 # Install Nginx
 sudo apt install -y nginx
 
-# Install MySQL 8
-sudo apt update -y
-sudo apt install -y mysql-server-8.0
-
-# Set MySQL root password and secure installation
-mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '$mysql_password';"
-mysql_secure_installation <<EOF
-
-Y
-$mysql_password
-$mysql_password
-Y
-Y
-Y
-Y
+# Configure MySQL with specific options
+cat <<EOF | sudo debconf-set-selections
+mysql-server-8.0 mysql-server/root_password password $mysql_password
+mysql-server-8.0 mysql-server/root_password_again password $mysql_password
+mysql-server-8.0 mysql-server-8.0/group-bysv GROUP BY into temporary tables
+mysql-server-8.0 mysql-server-8.0/prefix-core question
+mysql-server-8.0 mysql-server-8.0/really_downgrade question
+mysql-server-8.0 mysql-server-8.0/reverse_host_lookup boolean false
+mysql-server-8.0 mysql-server-8.0/validate_password_check_user_name boolean true
+mysql-server-8.0 mysql-server-8.0/validate_password_length integer 8
+mysql-server-8.0 mysql-server-8.0/validate_password_mixed_case_count integer 1
+mysql-server-8.0 mysql-server-8.0/validate_password_number_count integer 1
+mysql-server-8.0 mysql-server-8.0/validate_password_policy select 2
+mysql-server-8.0 mysql-server-8.0/validate_password_special_char_count integer 1
 EOF
+
+# Install MySQL server with the specific options
+sudo apt install -y mysql-server-8.0
 
 # Install Composer
 sudo apt update
@@ -118,6 +123,6 @@ sudo ufw delete allow 'Nginx HTTP'
 
 # Restart services
 systemctl restart nginx
-systemctl restart php"$php_versions_array[0]"-fpm
+systemctl restart php"${php_versions_array[0]}"-fpm
 
 echo "Script completed successfully."
